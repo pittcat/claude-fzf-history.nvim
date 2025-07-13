@@ -255,4 +255,3 @@ MIT License
 ## 🔗 相关项目
 
 - [fzf-lua](https://github.com/ibhagwan/fzf-lua) - 现代化的 FZF Neovim 插件
-- [Claude AI](https://claude.ai) - Anthropic 的 AI 助手
