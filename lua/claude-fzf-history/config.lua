@@ -56,6 +56,14 @@ M.defaults = {
     -- Preview command type: 'builtin' or 'external'
     -- 'builtin' uses fzf-lua's preview, 'external' uses native fzf preview
     type = "external",
+    -- Syntax highlighting settings
+    syntax_highlighting = {
+      enabled = true,               -- Enable syntax highlighting with bat
+      fallback = true,              -- Fallback to plain text if bat unavailable
+      theme = "Monokai Extended Bright",  -- bat theme
+      language = "markdown",        -- Default language for Q&A content
+      show_line_numbers = true,     -- Show line numbers in bat output
+    },
   },
 
   -- FZF keyboard mapping

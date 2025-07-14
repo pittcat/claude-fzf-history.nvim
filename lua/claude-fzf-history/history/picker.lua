@@ -310,7 +310,6 @@ function M.preview_qa_content(selected_line, history_items, display_opts)
   end
   
   logger.debug("Previewing item at index %d", index)
-  logger.log_function_return("picker", "preview_qa_content", "preview generated")
   
   local preview_lines = {}
   
@@ -351,7 +350,26 @@ function M.preview_qa_content(selected_line, history_items, display_opts)
     table.insert(preview_lines, string.format("Tags: %s", table.concat(item.tags, ", ")))
   end
   
-  return table.concat(preview_lines, "\n")
+  local content = table.concat(preview_lines, "\n")
+  
+  -- Apply syntax highlighting with bat if configured
+  local config = require('claude-fzf-history.config')
+  local preview_opts = config.get_preview_opts()
+  
+  if preview_opts.syntax_highlighting and preview_opts.syntax_highlighting.enabled then
+    logger.debug("Applying bat syntax highlighting")
+    local highlighted_content = M.apply_bat_highlighting(content, preview_opts.syntax_highlighting)
+    if highlighted_content then
+      logger.debug("Bat syntax highlighting successful")
+      logger.log_function_return("picker", "preview_qa_content", "preview with bat highlighting generated")
+      return highlighted_content
+    else
+      logger.debug("Bat syntax highlighting failed, using fallback")
+    end
+  end
+  
+  logger.log_function_return("picker", "preview_qa_content", "preview generated")
+  return content
 end
 
 function M.find_item_index_from_line(selected_line, history_items, display_opts)
@@ -919,6 +937,70 @@ function M.clear_filters()
   vim.notify("All filters cleared", vim.log.levels.INFO)
 end
 
+-- Apply bat syntax highlighting to content
+function M.apply_bat_highlighting(content, bat_opts)
+  local logger = get_logger()
+  
+  -- Check if bat is available
+  if vim.fn.executable("bat") ~= 1 then
+    logger.debug("bat command not available, skipping syntax highlighting")
+    if bat_opts.fallback then
+      return content  -- Return original content as fallback
+    else
+      return nil  -- Indicate failure
+    end
+  end
+  
+  logger.debug("bat executable found, applying syntax highlighting")
+  logger.debug("bat options: %s", vim.inspect(bat_opts))
+  
+  -- Build bat command with options
+  local bat_cmd = { "bat" }
+  
+  -- Add language specification
+  if bat_opts.language then
+    table.insert(bat_cmd, "--language=" .. bat_opts.language)
+  end
+  
+  -- Add theme specification
+  if bat_opts.theme then
+    table.insert(bat_cmd, "--theme=" .. bat_opts.theme)
+  end
+  
+  -- Add line numbers if requested
+  if bat_opts.show_line_numbers then
+    table.insert(bat_cmd, "--number")
+  end
+  
+  -- Additional bat options for better output
+  table.insert(bat_cmd, "--color=always")  -- Force colored output
+  table.insert(bat_cmd, "--style=grid")    -- Show grid for better readability
+  table.insert(bat_cmd, "--wrap=auto")     -- Auto wrap long lines
+  table.insert(bat_cmd, "--pager=never")   -- Don't use pager
+  
+  local full_cmd = table.concat(bat_cmd, " ")
+  logger.debug("Executing bat command: %s", full_cmd)
+  
+  -- Use vim.fn.system to pipe content through bat
+  local result = vim.fn.system(full_cmd, content)
+  local exit_code = vim.v.shell_error
+  
+  logger.debug("bat command exit code: %d", exit_code)
+  logger.debug("bat output length: %d", #result)
+  
+  if exit_code == 0 and result and #result > 0 then
+    logger.debug("bat syntax highlighting applied successfully")
+    return result
+  else
+    logger.warn("bat command failed with exit code %d", exit_code)
+    if bat_opts.fallback then
+      logger.debug("Using fallback: returning original content")
+      return content
+    else
+      return nil
+    end
+  end
+end
 
 
 return M
