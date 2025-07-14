@@ -36,24 +36,26 @@ M.defaults = {
     ["--height"] = "100%",
     ["--layout"] = "reverse",
     ["--border"] = "none",
-    -- Enable preview functionality using fzf native preview
-    ["--preview-window"] = "right:50%:wrap",
     winopts = {
       height = 0.7,
       width = 0.8,
       row = 0.35,
       col = 0.50,
-      preview = {
-        layout = 'flex',      -- Better responsive behavior
-        vertical = 'right:50%',
-        horizontal = 'down:50%',
-        flip_columns = 120,
-        delay = 100,          -- Preview delay to reduce flicker
-        wrap = false,         -- Better performance with long lines
-        border = "border",
-        scrollbar = "float",
-      },
     }
+  },
+
+  -- Preview settings
+  preview = {
+    enabled = true,                 -- Enable preview
+    hidden = false,                 -- Start with preview visible
+    position = "right:60%",         -- Preview window position
+    wrap = true,                    -- Enable line wrapping
+    toggle_key = "ctrl-/",          -- Key to toggle preview
+    scroll_up = "shift-up",         -- Preview scroll up
+    scroll_down = "shift-down",     -- Preview scroll down
+    -- Preview command type: 'builtin' or 'external'
+    -- 'builtin' uses fzf-lua's preview, 'external' uses native fzf preview
+    type = "external",
   },
 
   -- FZF keyboard mapping
@@ -202,6 +204,10 @@ function M.enable_debug()
   logger.enable_debug()
   M._config.logging.level = "DEBUG"
   M._config.logging.file_logging = true
+end
+
+function M.get_preview_opts()
+  return M._config.preview
 end
 
 function M.disable_debug()

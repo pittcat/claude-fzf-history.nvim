@@ -2,6 +2,7 @@ local M = {}
 
 local utils = require('claude-fzf-history.utils')
 local manager = require('claude-fzf-history.history.manager')
+local preview = require('claude-fzf-history.preview')
 
 local function get_logger()
   return require('claude-fzf-history.logger')
@@ -23,7 +24,14 @@ function M.create_history_picker(history_items, opts)
   local config = require('claude-fzf-history.config')
   local fzf_opts = config.get_fzf_opts()
   local display_opts = config.get_display_opts()
+  local preview_opts = config.get_preview_opts()
   local actions = config.get_actions()
+  
+  logger.debug("=== Configuration loaded ===")
+  logger.debug("Preview configuration: %s", vim.inspect(preview_opts))
+  logger.debug("Toggle key from config: %s", preview_opts.toggle_key)
+  logger.debug("Preview enabled: %s", preview_opts.enabled and "YES" or "NO")
+  logger.debug("Preview type: %s", preview_opts.type)
   
   logger.debug("=== Configuration loading completed ===")
   logger.debug("FZF opts multi: %s", fzf_opts["--multi"] and "YES" or "NO")
@@ -61,43 +69,93 @@ function M.create_history_picker(history_items, opts)
     end
   end
   
-  -- Set key binding configuration (removed Ctrl-Y)
+  -- Set key binding configuration with toggle preview support
   local keymap = {
     fzf = {
       ["tab"] = "toggle",  -- Tab key for multi-select
-      -- Removed Ctrl-Y preview function
+      [preview_opts.toggle_key] = "toggle-preview",  -- Toggle preview visibility
     }
   }
   
+  logger.debug("=== Toggle preview configuration ===")
+  logger.debug("Preview toggle key: %s", preview_opts.toggle_key)
+  logger.debug("Preview enabled: %s", preview_opts.enabled and "YES" or "NO")
+  logger.debug("Preview hidden: %s", preview_opts.hidden and "YES" or "NO")
+  
   logger.debug("=== Key binding configuration ===")
   logger.debug("Manual keymap: %s", vim.inspect(keymap))
+  logger.debug("Toggle preview keymap entry: [%s] = %s", preview_opts.toggle_key, keymap.fzf[preview_opts.toggle_key])
   
-  -- Configure fzf options
+  -- Configure fzf options using fzf-lua's expected structure
   local fzf_config = vim.tbl_deep_extend('force', fzf_opts, {
     prompt = 'Claude History> ',
-    header = 'Tab: Multi-select | Enter: Jump(single only) | Ctrl-E: Export | Ctrl-F: Filter | Esc: Exit',
+    header = string.format('Tab: Multi-select | Enter: Jump(single only) | Ctrl-E: Export | Ctrl-F: Filter | %s: Toggle Preview | Esc: Exit', 
+      preview_opts.toggle_key:gsub("ctrl%-", "Ctrl-"):gsub("^%l", string.upper)),
     fzf_opts = {
       ["--multi"] = true,  -- Correct multi-select configuration
+      ["--preview-window"] = preview_opts.position .. ":wrap",  -- Essential for preview display
     },
     -- Important: pass keymap configuration
     keymap = keymap,
     
-    -- Configure preview function
-    fn_preview = function(selected, opts)
-      logger.debug("=== FN_PREVIEW called ===")
+    -- fzf-lua preview configuration (this is the key!)
+    winopts = vim.tbl_deep_extend('force', fzf_opts.winopts or {}, {
+      preview = {
+        default = "builtin",
+        border = "rounded", 
+        wrap = preview_opts.wrap,
+        hidden = preview_opts.hidden,
+        horizontal = preview_opts.position,
+        layout = "flex",
+        delay = 100,
+      }
+    }),
+    
+    -- Preview configuration for our internal use
+    preview_opts = preview_opts,
+    
+    -- Configure custom preview command
+    preview = function(selected, opts)
+      logger.debug("=== PREVIEW FUNCTION CALLED ===")
+      logger.debug("Call timestamp: %s", os.date("%H:%M:%S"))
       logger.debug("Selected parameter: %s", vim.inspect(selected))
       logger.debug("Selected type: %s", type(selected))
+      logger.debug("Selected value: '%s'", tostring(selected))
       logger.debug("Opts parameter: %s", vim.inspect(opts))
+      logger.debug("History items available: %d", #history_items)
       
       if not selected or selected == "" then
-        logger.debug("Selected is empty, returning empty string")
-        return ""
+        logger.debug("Selected is empty or nil, returning fallback message")
+        return "No item selected for preview"
       end
       
-      logger.debug("Calling preview_qa_content with selected: %s", selected)
-      local preview_result = M.preview_qa_content(selected, history_items, display_opts)
+      logger.debug("Calling preview_qa_content with:")
+      logger.debug("  - selected: %s", selected)
+      logger.debug("  - history_items count: %d", #history_items) 
+      logger.debug("  - display_opts: %s", vim.inspect(display_opts))
+      
+      -- Extract selected line from fzf-lua's format
+      local selected_line
+      if type(selected) == "table" and #selected > 0 then
+        selected_line = selected[1]  -- fzf-lua passes an array with selected items
+        logger.debug("  - extracted from table: %s", selected_line)
+      else
+        selected_line = tostring(selected)
+        logger.debug("  - converted to string: %s", selected_line)
+      end
+      logger.debug("  - final selected_line: %s", selected_line)
+      
+      local success, preview_result = pcall(M.preview_qa_content, selected_line, history_items, display_opts)
+      
+      if not success then
+        logger.error("Preview generation failed: %s", preview_result)
+        return "Error generating preview: " .. tostring(preview_result)
+      end
+      
+      logger.debug("Preview generation successful")
       logger.debug("Preview result length: %d", string.len(preview_result))
       logger.debug("Preview result preview (first 100 chars): %s", string.sub(preview_result, 1, 100))
+      logger.debug("Preview result preview (last 50 chars): %s", string.sub(preview_result, -50))
       
       return preview_result
     end,
@@ -140,15 +198,23 @@ function M.create_history_picker(history_items, opts)
   logger.debug("=== FZF configuration preparation completed ===")
   logger.debug("Actions configured: %s", vim.inspect(vim.tbl_keys(fzf_config.actions)))
   logger.debug("Multi-select fzf_opts configured: %s", vim.inspect(fzf_config.fzf_opts))
-  logger.debug("Preview function configured: %s", fzf_config.fn_preview and "YES" or "NO")
+  logger.debug("Preview function configured: %s", fzf_config.preview and "YES" or "NO")
   logger.debug("Multi-select option: %s", fzf_config.fzf_opts and fzf_config.fzf_opts["--multi"] and "YES" or "NO")
-  logger.debug("Preview window option: %s", fzf_config["--preview-window"] or "NOT SET")
+  logger.debug("Preview window option: %s", fzf_config.fzf_opts and fzf_config.fzf_opts["--preview-window"] or "NOT SET")
+  logger.debug("CRITICAL: Preview window config: %s", fzf_config.fzf_opts and fzf_config.fzf_opts["--preview-window"] or "MISSING")
+  logger.debug("CRITICAL: Winopts preview config: %s", vim.inspect(fzf_config.winopts and fzf_config.winopts.preview))
+  logger.debug("CRITICAL: Preview function exists: %s", fzf_config.preview and "YES" or "NO")
   logger.debug("Winopts: %s", vim.inspect(fzf_config.winopts))
   logger.debug("Formatted items count: %d", #formatted_items)
   
   -- Print complete fzf_config for debugging
   logger.debug("=== Complete FZF configuration ===")
   logger.debug("Keymap in fzf_config: %s", vim.inspect(fzf_config.keymap))
+  logger.debug("Preview opts in fzf_config: %s", vim.inspect(fzf_config.preview_opts))
+  logger.debug("Header with toggle preview: %s", fzf_config.header)
+  logger.debug("Toggle preview key validation: %s -> %s", 
+    preview_opts.toggle_key, 
+    fzf_config.keymap and fzf_config.keymap.fzf and fzf_config.keymap.fzf[preview_opts.toggle_key] or "NOT FOUND")
   logger.debug("Full fzf_config: %s", vim.inspect(fzf_config))
   
   if #formatted_items > 0 then
@@ -225,6 +291,12 @@ function M.preview_qa_content(selected_line, history_items, display_opts)
     history_items_count = #history_items
   })
   
+  -- Validate input parameters
+  if not selected_line or selected_line == "" or selected_line == "nil" then
+    logger.warn("Invalid selected_line parameter: %s", tostring(selected_line))
+    return "No valid selection for preview"
+  end
+  
   local index = M.find_item_index_from_line(selected_line, history_items, display_opts)
   if not index then
     logger.warn("Could not find item index for selected line: %s", selected_line)
@@ -286,6 +358,12 @@ function M.find_item_index_from_line(selected_line, history_items, display_opts)
   -- Extract original index from formatted display line
   -- Improved matching logic to better handle strings containing box-drawing content
   local logger = get_logger()
+  
+  -- Validate input
+  if not selected_line or type(selected_line) ~= "string" or selected_line == "" then
+    logger.warn("Invalid selected_line parameter in find_item_index_from_line: %s", tostring(selected_line))
+    return nil
+  end
   
   local formatted_items = M.format_items_for_display(history_items, display_opts)
   
