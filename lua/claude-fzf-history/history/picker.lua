@@ -359,12 +359,14 @@ function M.preview_qa_content(selected_line, history_items, display_opts)
   if preview_opts.syntax_highlighting and preview_opts.syntax_highlighting.enabled then
     logger.debug("Applying bat syntax highlighting")
     local highlighted_content = M.apply_bat_highlighting(content, preview_opts.syntax_highlighting)
-    if highlighted_content then
+    if highlighted_content and highlighted_content ~= content then
       logger.debug("Bat syntax highlighting successful")
       logger.log_function_return("picker", "preview_qa_content", "preview with bat highlighting generated")
       return highlighted_content
+    elseif highlighted_content == content then
+      logger.debug("Bat syntax highlighting failed, using fallback content")
     else
-      logger.debug("Bat syntax highlighting failed, using fallback")
+      logger.debug("Bat syntax highlighting failed, no content returned")
     end
   end
   
@@ -954,35 +956,36 @@ function M.apply_bat_highlighting(content, bat_opts)
   logger.debug("bat executable found, applying syntax highlighting")
   logger.debug("bat options: %s", vim.inspect(bat_opts))
   
-  -- Build bat command with options
-  local bat_cmd = { "bat" }
+  -- Build bat command arguments as table for proper escaping
+  local bat_args = {}
   
   -- Add language specification
   if bat_opts.language then
-    table.insert(bat_cmd, "--language=" .. bat_opts.language)
+    table.insert(bat_args, "--language=" .. bat_opts.language)
   end
   
-  -- Add theme specification
+  -- Add theme specification with proper escaping
   if bat_opts.theme then
-    table.insert(bat_cmd, "--theme=" .. bat_opts.theme)
+    table.insert(bat_args, "--theme=" .. vim.fn.shellescape(bat_opts.theme))
   end
   
   -- Add line numbers if requested
   if bat_opts.show_line_numbers then
-    table.insert(bat_cmd, "--number")
+    table.insert(bat_args, "--number")
   end
   
   -- Additional bat options for better output
-  table.insert(bat_cmd, "--color=always")  -- Force colored output
-  table.insert(bat_cmd, "--style=grid")    -- Show grid for better readability
-  table.insert(bat_cmd, "--wrap=auto")     -- Auto wrap long lines
-  table.insert(bat_cmd, "--pager=never")   -- Don't use pager
+  table.insert(bat_args, "--color=always")  -- Force colored output
+  table.insert(bat_args, "--style=grid")    -- Show grid for better readability
+  table.insert(bat_args, "--wrap=auto")     -- Auto wrap long lines
+  table.insert(bat_args, "--pager=never")   -- Don't use pager
   
-  local full_cmd = table.concat(bat_cmd, " ")
-  logger.debug("Executing bat command: %s", full_cmd)
+  -- Construct command with proper escaping
+  local bat_cmd = "bat " .. table.concat(bat_args, " ")
+  logger.debug("Executing bat command: %s", bat_cmd)
   
   -- Use vim.fn.system to pipe content through bat
-  local result = vim.fn.system(full_cmd, content)
+  local result = vim.fn.system(bat_cmd, content)
   local exit_code = vim.v.shell_error
   
   logger.debug("bat command exit code: %d", exit_code)
@@ -992,7 +995,7 @@ function M.apply_bat_highlighting(content, bat_opts)
     logger.debug("bat syntax highlighting applied successfully")
     return result
   else
-    logger.warn("bat command failed with exit code %d", exit_code)
+    logger.warn("bat command failed with exit code %d, stderr: %s", exit_code, result)
     if bat_opts.fallback then
       logger.debug("Using fallback: returning original content")
       return content
