@@ -350,6 +350,7 @@ function M.parse_claude_code_content(lines, bufnr)
   local in_box = false
   local box_content = {}
   local line_start = 0
+  local in_system_reminder = false
   
   -- Improved state machine parsing, mimicking Python success logic
   for i, line in ipairs(lines) do
@@ -357,24 +358,38 @@ function M.parse_claude_code_content(lines, bufnr)
     
     -- Detect new user question
     if line_stripped:match("^>%s+") then
-      -- Save previous Q&A pair
+      -- Save previous Q&A pair (but skip /ide questions)
       if current_question ~= "" and current_answer ~= "" then
-        local qa_item = create_qa_item(
-          trim(current_question),
-          trim(current_answer),
-          {
-            id = #qa_items + 1,
-            timestamp = os.time() - ((#lines - i) * 10),
-            buffer_line_start = line_start,
-            buffer_line_end = i - 1,
-            metadata = {
-              bufnr = bufnr,
-              format = "claude_code",
-              interaction_type = "user_question"
+        -- Check if this is an /ide question we should skip
+        local should_skip = current_question:match("^/ide") or 
+                           current_question:match("^%s*/ide")
+        
+        -- Also skip if the answer is just "Connected to Neovim."
+        local trimmed_answer = trim(current_answer)
+        if trimmed_answer:match("^⎿%s*Connected to Neovim%.?$") then
+          should_skip = true
+        end
+        
+        if not should_skip then
+          local qa_item = create_qa_item(
+            trim(current_question),
+            trim(current_answer),
+            {
+              id = #qa_items + 1,
+              timestamp = os.time() - ((#lines - i) * 10),
+              buffer_line_start = line_start,
+              buffer_line_end = i - 1,
+              metadata = {
+                bufnr = bufnr,
+                format = "claude_code",
+                interaction_type = "user_question"
+              }
             }
-          }
-        )
-        table.insert(qa_items, qa_item)
+          )
+          table.insert(qa_items, qa_item)
+        else
+          logger.debug("Skipping /ide question at line %d", line_start)
+        end
       end
       
       -- Start new Q&A pair
@@ -384,12 +399,32 @@ function M.parse_claude_code_content(lines, bufnr)
       in_answer = true
       in_box = false
       box_content = {}
+      in_system_reminder = false
       logger.debug("Found user question at line %d: %s", i, current_question:sub(1, 50))
       
     -- If in answer, collect all content
     elseif in_answer then
+      -- Handle system reminder blocks
+      if line:match("<system%-reminder>") then
+        in_system_reminder = true
+        goto continue
+      elseif line:match("</system%-reminder>") then
+        in_system_reminder = false
+        goto continue
+      elseif in_system_reminder then
+        -- Skip all content within system reminder blocks
+        goto continue
+      
+      -- Filter out IDE connection messages
+      elseif line_stripped:match("^> /ide") and lines[i+1] and trim(lines[i+1]):match("^⎿%s+Connected to") then
+        -- Skip IDE connection pattern (current and next line)
+        goto continue
+      elseif line_stripped:match("^⎿%s+Connected to") then
+        -- Skip standalone connection messages
+        goto continue
+      
       -- Detect box start
-      if line_stripped:match("^╭") then
+      elseif line_stripped:match("^╭") then
         in_box = true
         box_content = {line}
         
@@ -427,26 +462,42 @@ function M.parse_claude_code_content(lines, bufnr)
         current_answer = current_answer .. line
       end
     end
+    
+    ::continue::
   end
   
   -- Process last Q&A pair
   if current_question ~= "" and current_answer ~= "" then
-    local qa_item = create_qa_item(
-      trim(current_question),
-      trim(current_answer),
-      {
-        id = #qa_items + 1,
-        timestamp = os.time(),
-        buffer_line_start = line_start,
-        buffer_line_end = #lines,
-        metadata = {
-          bufnr = bufnr,
-          format = "claude_code",
-          interaction_type = "final"
+    -- Check if this is an /ide question we should skip
+    local should_skip = current_question:match("^/ide") or 
+                       current_question:match("^%s*/ide")
+    
+    -- Also skip if the answer is just "Connected to Neovim."
+    local trimmed_answer = trim(current_answer)
+    if trimmed_answer:match("^⎿%s*Connected to Neovim%.?$") then
+      should_skip = true
+    end
+    
+    if not should_skip then
+      local qa_item = create_qa_item(
+        trim(current_question),
+        trim(current_answer),
+        {
+          id = #qa_items + 1,
+          timestamp = os.time(),
+          buffer_line_start = line_start,
+          buffer_line_end = #lines,
+          metadata = {
+            bufnr = bufnr,
+            format = "claude_code",
+            interaction_type = "final"
+          }
         }
-      }
-    )
-    table.insert(qa_items, qa_item)
+      )
+      table.insert(qa_items, qa_item)
+    else
+      logger.debug("Skipping final /ide question")
+    end
   end
   
   logger.info("Parsed %d Claude Code Q&A items with improved box content handling", #qa_items)
