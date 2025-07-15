@@ -30,8 +30,8 @@
 │   history/        │   logger.lua   │   utils.lua          │
 │   ├─ parser.lua   │  (Logging)     │  (Utilities)        │
 │   ├─ picker.lua   │                │                      │
-│   ├─ manager.lua  │                │                      │
-│   └─ init.lua     │                │                      │
+│   ├─ manager.lua  │   preview.lua  │                      │
+│   └─ init.lua     │  (Preview)     │                      │
 └─────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
@@ -40,6 +40,9 @@
 ├─────────────────────────────────────────────────────────────┤
 │    fzf-lua        │    Neovim API  │  System Clipboard   │
 │   (FZF Interface) │   (Buffers)    │   (Export)          │
+│                   │                │                      │
+│       bat         │                │                      │
+│  (Syntax Highlight)│                │                      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -75,6 +78,7 @@
 M.defaults = {
   history = { max_items, min_item_length, cache_timeout, auto_refresh },
   display = { max_question_length, show_timestamp, show_line_numbers, date_format },
+  preview = { enabled, hidden, position, wrap, toggle_key, scroll_up, scroll_down, type, syntax_highlighting },
   fzf_opts = { fzf specific options },
   keymap = { fzf key bindings },
   logging = { level, file_logging, console_logging },
@@ -93,6 +97,12 @@ M.defaults = {
 **Commands:**
 - `:ClaudeHistory`: Main history picker command
 - `:ClaudeHistoryDebug <action>`: Debug mode commands
+  - `enable/disable`: Toggle debug mode
+  - `status`: Show debug status
+  - `log`: Open log file
+  - `buffer`: Analyze current buffer
+  - `export`: Export debug info to clipboard
+  - `clear`: Clear log file
 
 ### 4. History Module (`lua/claude-fzf-history/history/`)
 
@@ -136,6 +146,8 @@ M.defaults = {
 - `preview_qa_content(selected, history_items, display_opts)`: Preview generation
 - `handle_jump_action(selected, history_items)`: Jump action handler
 - `handle_export_action(selected, history_items)`: Export action handler
+- `create_preview_handler(items, opts)`: Preview window handler
+- `toggle_preview()`: Toggle preview visibility
 
 **Display Format:**
 ```
@@ -170,7 +182,20 @@ M.defaults = {
 - Caller information tracking
 - Timestamp formatting
 
-### 6. Utilities (`lua/claude-fzf-history/utils.lua`)
+### 6. Preview System (`lua/claude-fzf-history/preview.lua`)
+
+**Responsibilities:**
+- Preview content generation
+- Syntax highlighting with bat integration
+- Preview window management
+- Fallback to plain text when bat unavailable
+
+**Key Functions:**
+- `create_preview_content(item, opts)`: Generate preview content
+- `apply_syntax_highlighting(content, language)`: Apply bat highlighting
+- `handle_preview_toggle()`: Toggle preview visibility
+
+### 7. Utilities (`lua/claude-fzf-history/utils.lua`)
 
 **Responsibilities:**
 - Common utility functions
@@ -435,6 +460,8 @@ tests/
 - Advanced filtering options
 - Export format extensions
 - Remote conversation syncing
+- Enhanced preview modes
+- Custom syntax highlighting themes
 
 ### 2. Performance Improvements
 

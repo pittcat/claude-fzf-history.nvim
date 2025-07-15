@@ -9,6 +9,9 @@ An intelligent Neovim plugin for browsing and navigating Claude AI terminal conv
 - 🔍 **Smart Parsing**: Automatically detect and parse Claude terminal conversation content
 - 🎯 **Precise Navigation**: One-click jump to specific conversation locations
 - 📤 **Batch Export**: Multi-select export conversations to Markdown
+- 👁️ **Preview Window**: Toggle-able preview with syntax highlighting support
+- 🌈 **Syntax Highlighting**: Bat integration for beautiful code preview
+- 🔧 **Debug Tools**: Comprehensive debugging commands and standalone scripts
 - ⚡ **High Performance**: ~1000 items/second parsing, <100ms response time
 - 🔧 **Highly Configurable**: Flexible configuration options and key bindings
 - 🎨 **Modern Interface**: Responsive selection interface based on fzf-lua
@@ -19,6 +22,7 @@ An intelligent Neovim plugin for browsing and navigating Claude AI terminal conv
 
 - Neovim >= 0.9.0
 - [fzf-lua](https://github.com/ibhagwan/fzf-lua) plugin
+- [bat](https://github.com/sharkdp/bat) (optional, for syntax highlighting)
 
 ### Using lazy.nvim
 
@@ -62,6 +66,9 @@ use {
 | `Enter` | Jump to conversation (single selection only) |
 | `Ctrl-E` | Export selected conversations to Markdown |
 | `Ctrl-F` | Open filter options |
+| `Ctrl-/` | Toggle preview window |
+| `Shift-Up` | Scroll preview up |
+| `Shift-Down` | Scroll preview down |
 | `Esc` | Exit picker |
 
 ### Multi-selection
@@ -69,6 +76,13 @@ use {
 - Use `Tab` key to select multiple conversations
 - Pressing `Enter` with multiple selections will show a warning to prevent accidental jumps
 - Use `Ctrl-E` to batch export multiple conversations
+
+### Preview Window
+
+- **Toggle Preview**: Use `Ctrl-/` to show/hide the preview window
+- **Syntax Highlighting**: Automatic syntax highlighting with bat (if available)
+- **Scroll Navigation**: Use `Shift-Up` and `Shift-Down` to scroll through preview
+- **Fallback Mode**: Automatically falls back to plain text if bat is not available
 
 ### Export Feature
 
@@ -119,6 +133,25 @@ require('claude-fzf-history').setup({
     show_timestamp = true,     -- Show timestamps
     show_line_numbers = true,  -- Show line numbers
     date_format = "%Y-%m-%d %H:%M",
+  },
+  
+  -- Preview settings
+  preview = {
+    enabled = true,              -- Enable preview
+    hidden = false,              -- Start with preview hidden
+    position = "right:60%",      -- Preview window position
+    wrap = true,                 -- Enable line wrapping
+    toggle_key = "ctrl-/",       -- Toggle preview key
+    scroll_up = "shift-up",      -- Scroll up key
+    scroll_down = "shift-down",  -- Scroll down key
+    type = "external",           -- Preview type: 'builtin' or 'external'
+    syntax_highlighting = {
+      enabled = true,            -- Enable syntax highlighting
+      fallback = true,           -- Fallback to plain text if bat unavailable
+      theme = "Monokai Extended Bright",  -- Bat theme
+      language = "markdown",     -- Default language
+      show_line_numbers = true,  -- Show line numbers
+    },
   },
   
   -- Keymaps
@@ -173,22 +206,47 @@ require('claude-fzf-history').setup({
 | `:ClaudeHistoryDebug disable` | Disable debug mode |
 | `:ClaudeHistoryDebug status` | View debug status |
 | `:ClaudeHistoryDebug log` | Open log file |
+| `:ClaudeHistoryDebug buffer` | Analyze current buffer |
+| `:ClaudeHistoryDebug export` | Export debug info to clipboard |
+| `:ClaudeHistoryDebug clear` | Clear log file |
 
 ## 🔧 Development and Debugging
 
-### Enable Debug Mode
+### Debug Commands
 
 ```vim
+# Enable debug mode
 :ClaudeHistoryDebug enable
+
+# Check current buffer
+:ClaudeHistoryDebug buffer
+
+# Export debug info to clipboard
+:ClaudeHistoryDebug export
+
+# Clear log file
+:ClaudeHistoryDebug clear
+
+# View debug status
+:ClaudeHistoryDebug status
+
+# Open log file
+:ClaudeHistoryDebug log
+```
+
+### Standalone Debug Tools
+
+```bash
+# Run parser analysis on current directory
+lua debug/debug_parser.lua
+
+# Test parser with specific file
+lua debug/parse_test.lua /path/to/claude/buffer
 ```
 
 ### View Logs
 
 Log file location: `~/.local/state/nvim/log/claude-fzf-history.log`
-
-```vim
-:ClaudeHistoryDebug log
-```
 
 ### Run Tests
 
