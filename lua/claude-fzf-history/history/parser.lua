@@ -356,8 +356,8 @@ function M.parse_claude_code_content(lines, bufnr)
   for i, line in ipairs(lines) do
     local line_stripped = trim(line)
     
-    -- Detect new user question
-    if line_stripped:match("^>%s+") then
+    -- Detect new user question - must start with > as first character
+    if line:match("^>") then
       -- Save previous Q&A pair (but skip /ide questions)
       if current_question ~= "" and current_answer ~= "" then
         -- Check if this is an /ide question we should skip
@@ -393,7 +393,7 @@ function M.parse_claude_code_content(lines, bufnr)
       end
       
       -- Start new Q&A pair
-      current_question = line_stripped:gsub("^>%s+", "")
+      current_question = line:gsub("^>%s*", "")
       current_answer = ""
       line_start = i + 1
       in_answer = true
