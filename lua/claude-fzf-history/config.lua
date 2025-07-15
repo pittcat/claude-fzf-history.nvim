@@ -36,6 +36,7 @@ M.defaults = {
 		["--height"] = "100%",
 		["--layout"] = "reverse",
 		["--border"] = "none",
+		silent = true, -- Hide deprecation warnings
 		winopts = {
 			height = 0.7,
 			width = 0.8,
