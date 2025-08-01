@@ -113,9 +113,6 @@ function M.create_history_picker(history_items, opts)
 			},
 		}),
 
-		-- Preview configuration for our internal use
-		preview_opts = preview_opts,
-
 		-- Configure custom preview command
 		preview = function(selected, opts)
 			logger.debug("=== PREVIEW FUNCTION CALLED ===")
