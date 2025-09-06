@@ -28,15 +28,12 @@ An intelligent Neovim plugin for browsing and navigating Claude AI terminal conv
 
 ```lua
 {
-  'your-username/claude-fzf-history.nvim',
+  'pittcat/claude-fzf-history.nvim',
   dependencies = { 'ibhagwan/fzf-lua' },
   config = function()
     require('claude-fzf-history').setup()
   end,
   cmd = { 'ClaudeHistory', 'ClaudeHistoryDebug' },
-  keys = {
-    { '<leader>ch', '<cmd>ClaudeHistory<cr>', desc = 'Claude History' },
-  },
 }
 ```
 
@@ -44,7 +41,7 @@ An intelligent Neovim plugin for browsing and navigating Claude AI terminal conv
 
 ```lua
 use {
-  'your-username/claude-fzf-history.nvim',
+  'pittcat/claude-fzf-history.nvim',
   requires = { 'ibhagwan/fzf-lua' },
   config = function()
     require('claude-fzf-history').setup()
@@ -275,7 +272,7 @@ Issues and Pull Requests are welcome!
 ### Development Environment Setup
 
 ```bash
-git clone https://github.com/your-username/claude-fzf-history.nvim.git
+git clone https://github.com/pittcat/claude-fzf-history.nvim.git
 cd claude-fzf-history.nvim
 ```
 
