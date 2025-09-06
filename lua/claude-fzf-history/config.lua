@@ -77,7 +77,7 @@ M.defaults = {
 
 	-- Shortcut key settings
 	keymaps = {
-		history = "<leader>ch",
+		history = nil, -- No default keybinding to avoid conflicts
 	},
 
 	-- Parser settings
